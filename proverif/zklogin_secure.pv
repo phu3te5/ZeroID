@@ -1,0 +1,49 @@
+free user, token, salt, zkproof, publicSignals: bitstring.
+free c: channel.
+free net: channel.
+
+fun genToken(bitstring): bitstring.
+fun genSalt(bitstring): bitstring.
+fun zkProve(bitstring, bitstring): bitstring.
+fun verifyProof(bitstring, bitstring): bool.
+
+free userSecret: bitstring.
+
+event beginAuth(bitstring).
+event endAuth(bitstring).
+event beginProofGen(bitstring).
+event endProofGen(bitstring).
+event beginVerify(bitstring).
+event endVerify(bool).
+event serverReceivedToken(bitstring).
+event serverReceivedProof(bitstring).
+event serverDecision(bool).
+
+let Client =
+    beginAuth(userSecret);
+    let t = genToken(userSecret) in
+    out(c, t);
+    endAuth(t);
+    let s = genSalt(userSecret) in
+    beginProofGen(t);
+    let zk = zkProve(t, s) in
+    out(c, zk);
+    endProofGen(zk)
+
+let Server =
+    in(c, token: bitstring);
+    serverReceivedToken(token);
+    in(c, zk: bitstring);
+    serverReceivedProof(zk);
+    beginVerify(zk);
+    let result = verifyProof(zk, publicSignals) in
+    serverDecision(result);
+    out(net, result);
+    endVerify(result)
+
+process
+    (!Client | !Server)
+
+query attacker(userSecret).
+query forall t: bitstring; event(endAuth(t)) ==> event(beginAuth(userSecret)).
+query forall zk: bitstring; event(serverReceivedProof(zk)) ==> event(endProofGen(zk)).
