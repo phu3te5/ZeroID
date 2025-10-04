@@ -12,7 +12,7 @@ async function handleOAuthCallback(req, res) {
     if (!user) {
       const salt = generateSalt();
       user = await User.create({
-        provider: profile.provider,       // e.g. 'github', 'discord'
+        provider: profile.provider,
         providerId: profile.id,
         name: profile.displayName || profile.username || 'Anonymous',
         email: profile.emails?.[0]?.value || profile.email,
@@ -23,12 +23,12 @@ async function handleOAuthCallback(req, res) {
     const token = generateToken(user);
     const encodedUser = encodeURIComponent(JSON.stringify(user));
     res.redirect(`http://localhost:3000/?token=${token}&user=${encodedUser}`);
+    // ✅ Only ONE redirect
   } catch (err) {
     console.error('OAuth callback error:', err);
     res.status(500).send('OAuth callback failed');
   }
 }
-
 // Si tu veux garder Google séparé pour le moment :
 const { google } = require('googleapis');
 const oauthConfig = require('../config/oauth');

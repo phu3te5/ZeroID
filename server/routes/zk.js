@@ -1,23 +1,19 @@
-// In /home/omar/zklogin-mern/server/routes/zk.js
+// /home/omar/zklogin-mern/server/routes/zk.js
 
 const express = require('express');
 const router = express.Router();
 
-// Import the controller functions
-const { proveHandler, verifyZKProof } = require('../controllers/zkController');
+// Only keep verification — no proof generation on server
+const { verifyZKProof } = require('../controllers/zkController');
 
-// Define the route for ZK proof generation
-// This will handle POST requests to /api/zk/prove
-router.post('/prove', proveHandler);
+// ❌ REMOVE: router.post('/prove', proveHandler);
 
-// Define the route for ZK proof verification
-// This will handle POST requests to /api/zk/verify
+// ✅ KEEP: Verify proofs sent from client
 router.post('/verify', verifyZKProof);
 
-// A simple "ping" route to test if the router is working
+// Ping route (optional)
 router.get('/ping', (req, res) => {
   res.send("ZK Route is alive and well!");
 });
 
-// Export the router so it can be used in server.js
 module.exports = router;

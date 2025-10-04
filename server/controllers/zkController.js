@@ -1,29 +1,10 @@
-// In /home/omar/zklogin-mern/server/controllers/zkController.js
+// /home/omar/zklogin-mern/server/controllers/zkController.js
 
-const { proveZKLogin, verifyProof } = require('../utils/zk');
+const { verifyProof } = require('../utils/zk');
 
-// --- PROVE HANDLER ---
-const proveHandler = async (req, res) => {
-  // Debug log to see what the server receives
-  console.log('--- Received request at /api/zk/prove ---');
-  console.log('Request Body:', req.body);
+// ❌ REMOVE proveHandler — proof is generated in browser
 
-  try {
-    const { stid, aud, iss, salt, vku, T_exp, r } = req.body;
-
-    // Debug log to see variables after deconstruction
-    console.log('Deconstructed Variables:', { stid, aud, iss, salt, vku, T_exp, r });
-
-    const { proof, publicSignals } = await proveZKLogin(stid, aud, iss, salt, vku, T_exp, r);
-    res.json({ proof, publicSignals });
-
-  } catch (err) {
-    console.error("ZK proof generation failed:", err);
-    res.status(500).json({ error: err.message });
-  }
-};
-
-// --- VERIFY HANDLER ---
+// ✅ KEEP ONLY verification
 const verifyZKProof = async (req, res) => {
   try {
     const { proof, publicSignals } = req.body;
@@ -35,9 +16,7 @@ const verifyZKProof = async (req, res) => {
   }
 };
 
-
-// ✨ THE FIX: Export the handler functions so other files can import them.
 module.exports = {
-  proveHandler,
+  // proveHandler, ← REMOVED
   verifyZKProof
 };

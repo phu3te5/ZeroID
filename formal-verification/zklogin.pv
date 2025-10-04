@@ -1,0 +1,62 @@
+(* zkLogin Protocol in ProVerif *)
+
+(* Channels *)
+free c: channel.
+free s: channel.
+
+(* Constants / public parameters *)
+const sub: bitstring.       (* User ID from OP *)
+const aud: bitstring.       (* Audience *)
+const iss: bitstring.       (* Issuer *)
+const vku: bitstring.       (* Verification key *)
+const T_exp: bitstring.     (* Expiration time *)
+const accept: bitstring.
+const reject: bitstring.
+
+(* Functions *)
+fun H(bitstring, bitstring, bitstring, bitstring): bitstring.       (* Poseidon hash *)
+fun H3(bitstring, bitstring, bitstring): bitstring.                 (* Poseidon hash 3 *)
+fun zkproof(bitstring, bitstring, bitstring, bitstring, bitstring, bitstring, bitstring): bitstring.
+fun verify(bitstring, bitstring, bitstring): bool.
+
+(* Variables *)
+var x: bitstring.
+
+(* Private secrets *)
+free salt: bitstring [private].
+free r: bitstring [private].
+
+(* Equations *)
+equation H(sub, aud, iss, salt) = userComp.
+equation H3(vku, T_exp, r) = nonce.
+equation verify(userComp, nonce, zkproof(sub, aud, iss, salt, vku, T_exp, r)) = true.
+
+(* Events *)
+event client_started.
+event server_accept.
+
+(* Client Process *)
+let process_client =
+  event client_started;
+  out(c, zkproof(sub, aud, iss, salt, vku, T_exp, r)).
+
+(* Server Process *)
+let process_server =
+  in(c, x);
+  if verify(userComp, nonce, x) then
+    ( event server_accept; out(s, accept) )
+  else
+    out(s, reject).
+
+(* Adversary *)
+process
+  (!process_client) | (!process_server)
+
+(* Secrecy of salt *)
+query attacker(salt).
+
+(* Authentication: if server accepts, client must have run *)
+query event(server_accept) ==> event(client_started).
+
+(* Zero-knowledge: adversary learns nothing about salt *)
+query not attacker(salt).
