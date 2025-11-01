@@ -1,3 +1,4 @@
+//  server/controllers/mpcController.js
 const mongoose = require('mongoose');
 const SaltShare = require('../models/SaltShare');
 

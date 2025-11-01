@@ -1,20 +1,16 @@
+// client/src/App.js
 import React, { useEffect, useState } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
-
 import { groth16 } from 'snarkjs';
+
 function splitNumericSalt(salt, sharesCount = 5, threshold = 3) {
-  // Convert salt to number
   const num = BigInt(salt);
   const parts = [];
-
-  // Generate random coefficients for polynomial
   const coeffs = [];
   for (let i = 1; i < threshold; i++) {
     coeffs.push(BigInt(Math.floor(Math.random() * 1000000)));
   }
-
-  // Evaluate polynomial at x=1,2,...,sharesCount
   for (let x = 1; x <= sharesCount; x++) {
     let y = num;
     for (let i = 1; i < threshold; i++) {
@@ -22,20 +18,14 @@ function splitNumericSalt(salt, sharesCount = 5, threshold = 3) {
     }
     parts.push(y.toString());
   }
-
   return parts.map((share, i) => ({ part: i + 1, share }));
 }
 
 function combineNumericShares(shares) {
-  // Take first 3 shares
   const points = shares.slice(0, 3).map(s => [BigInt(s.part), BigInt(s.share)]);
   const [x1, y1] = points[0];
   const [x2, y2] = points[1];
   const [x3, y3] = points[2];
-
-  // Lagrange interpolation for constant term (secret)
-  // L(x) = y1 * (x-x2)(x-x3)/((x1-x2)(x1-x3)) + ...
-  // At x=0: L(0) = y1 * (x2*x3)/((x1-x2)(x1-x3)) + ...
 
   const denom1 = (x1 - x2) * (x1 - x3);
   const denom2 = (x2 - x1) * (x2 - x3);
@@ -46,10 +36,9 @@ function combineNumericShares(shares) {
   const term3 = y3 * x1 * x2 / denom3;
 
   const secret = term1 + term2 + term3;
-
   return secret.toString();
 }
-// Parse JWT
+
 function parseJwt(token) {
   try {
     const base64Url = token.split('.')[1];
@@ -57,7 +46,7 @@ function parseJwt(token) {
     const jsonPayload = decodeURIComponent(
       atob(base64)
         .split('')
-        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
         .join('')
     );
     return JSON.parse(jsonPayload);
@@ -67,14 +56,12 @@ function parseJwt(token) {
   }
 }
 
-// Generate numeric salt (digits only)
 function generateNumericSalt(len = 16) {
   const array = new Uint8Array(len);
   window.crypto.getRandomValues(array);
   return Array.from(array, b => (b % 10).toString()).join('');
 }
 
-// Generate random decimal string (for 'r')
 function generateRandomDecimalString(bytes = 8) {
   const array = new Uint8Array(bytes);
   window.crypto.getRandomValues(array);
@@ -89,51 +76,49 @@ function App() {
   const [isVerified, setIsVerified] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Recover salt from MPC shares
- // Backup salt to MPC
-const backupSaltToMPC = async (userId, salt) => {
-  try {
-    const shares = splitNumericSalt(salt, 5, 3);
-    const shareObjects = shares.map((s, i) => ({
-      part: i + 1,
-      share: s.share // ✅ plain string
-    }));
+  const backupSaltToMPC = async (userId, salt) => {
+    try {
+      const shares = splitNumericSalt(salt, 5, 3);
+      const shareObjects = shares.map((s, i) => ({
+        part: i + 1,
+        share: s.share
+      }));
 
-    const response = await fetch('http://localhost:3001/api/mpc/store', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, shares: shareObjects })
-    });
+      const response = await fetch('http://localhost:3001/api/mpc/store', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, shares: shareObjects })
+      });
 
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    console.log('Salt backup successful');
-  } catch (err) {
-    console.error('MPC backup failed:', err);
-    alert('⚠️ Salt backup failed...');
-  }
-};
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      console.log('Salt backup successful');
+    } catch (err) {
+      console.error('MPC backup failed:', err);
+      alert('⚠️ Salt backup failed...');
+    }
+  };
 
-// Recover salt from MPC
-const recoverSaltFromMPC = async (userId) => {
-  try {
-    console.log('Attempting to recover salt for userId:', userId);
-    const res = await fetch(`http://localhost:3001/api/mpc/recover/${userId}`);
-    const data = await res.json();
-    console.log('Server returned:', data);
+  const recoverSaltFromMPC = async (userId) => {
+    try {
+      console.log('Attempting to recover salt for userId:', userId);
+      const res = await fetch(`http://localhost:3001/api/mpc/recover/${userId}`);
+      const data = await res.json();
+      console.log('Server returned:', data);
 
-    if (!data.shares || data.shares.length < 3) {
-      console.warn('Not enough shares to recover salt:', data.shares?.length);
+      if (!data.shares || data.shares.length < 3) {
+        console.warn('Not enough shares to recover salt:', data.shares?.length);
+        return null;
+      }
+
+      const recovered = combineNumericShares(data.shares);
+      console.log('Recovered salt:', recovered);
+      return recovered;
+    } catch (err) {
+      console.error('MPC recovery failed:', err);
       return null;
     }
+  };
 
-    const recovered = combineNumericShares(data.shares);
-    console.log('Recovered salt:', recovered);
-    return recovered;
-  } catch (err) {
-    console.error('MPC recovery failed:', err);
-    return null;
-  }
-};
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tokenParam = params.get('token');
@@ -145,12 +130,10 @@ const recoverSaltFromMPC = async (userId) => {
         let salt = localStorage.getItem('zkSalt');
 
         if (!salt) {
-          // Try MPC recovery
           salt = await recoverSaltFromMPC(user._id);
         }
 
         if (!salt) {
-          // Generate new salt + backup
           salt = generateNumericSalt(16);
           localStorage.setItem('zkSalt', salt);
           await backupSaltToMPC(user._id, salt);
@@ -160,15 +143,6 @@ const recoverSaltFromMPC = async (userId) => {
         setToken(tokenParam);
         localStorage.setItem('token', tokenParam);
         localStorage.setItem('user', userString);
-      } else {
-        // Restore from localStorage
-        const savedToken = localStorage.getItem('token');
-        const savedUser = localStorage.getItem('user');
-        const savedSalt = localStorage.getItem('zkSalt');
-        if (savedToken && savedUser && savedSalt) {
-          setUser({ ...JSON.parse(savedUser), salt: savedSalt });
-          setToken(savedToken);
-        }
       }
     };
 
@@ -192,7 +166,6 @@ const recoverSaltFromMPC = async (userId) => {
       return;
     }
 
-    // ⚠️ Use 'sƟd' to match your original circuit!
     const inputs = {
       sub: (payload.sub || '123456').replace(/\D/g, '') || '123456',
       aud: '654321',
@@ -256,30 +229,59 @@ const recoverSaltFromMPC = async (userId) => {
   };
 
   const handleLoginGoogle = () => {
-    window.location.href = 'http://localhost:3001/api/auth/google';
-  };
-  const handleLoginGithub = () => {
-    window.location.href = 'http://localhost:3001/api/auth/github';
-  };
-  const handleLoginDiscord = () => {
-    window.location.href = 'http://localhost:3001/api/auth/discord';
+    window.location.href = 'http://localhost:3001/api/auth/google?prompt=select_account';
   };
 
-  const handleLogout = () => {
-    setUser(null);
-    setToken(null);
-    setProof(null);
-    setPublicSignals(null);
-    setIsVerified(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('zkSalt');
-    window.location.href = '/';
+  const handleLoginGithub = () => {
+    window.location.href = 'http://localhost:3001/api/auth/github'; // no fake prompt
   };
+
+  const handleLoginDiscord = () => {
+    window.location.href = 'http://localhost:3001/api/auth/discord'; // no fake prompt
+  };
+
+ // This is the NEW, improved function for client/src/App.js
+
+const handleLogout = () => {
+  // First, figure out which provider the user logged in with.
+  // We get this from the 'user' object before we delete it.
+  const provider = user?.provider;
+
+  // 1. Delete all of the application's data from state and local storage.
+  setUser(null);
+  setToken(null);
+  setProof(null);
+  setPublicSignals(null);
+  setIsVerified(null);
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  localStorage.removeItem('zkSalt');
+
+  // 2. Redirect the user to the correct provider to complete the logout.
+  // This is the key to restarting the login mechanism for a new user.
+  if (provider === 'github') {
+    // Redirect to GitHub's homepage. The user can sign out from the top-right menu.
+    window.location.href = 'https://github.com';
+  } else if (provider === 'discord') {
+    // Redirect to Discord's web app.
+    window.location.href = 'https://discord.com/app';
+  } else {
+    // For Google or any other case, just go back to our app's home page.
+    window.location.href = '/';
+  }
+};
 
   return (
     <div className="container py-5">
       <h1 className="mb-4">zkLogin Frontend (Client-Side ZK)</h1>
+
+      {!user && (
+        <div className="alert alert-info mb-3">
+          <strong>Note:</strong> To log in with a different GitHub or Discord account, 
+          please log out of those services first in another browser tab.
+        </div>
+      )}
+
       {user ? (
         <div className="card p-4 shadow">
           <h4>Welcome, {user.name}</h4>

@@ -1,3 +1,4 @@
+// server/config/oauth.js
 require('dotenv').config();
 
 module.exports = {

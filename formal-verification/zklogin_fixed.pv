@@ -1,4 +1,4 @@
-(* zkLogin Protocol Model for ProVerif 2.05 *)
+(* zkLogin Protocol Model for ProVerif 2.05 - CORRECTED *)
 (* Author: AIT BEN IYCHE Omar *)
 
 type salt_t.
@@ -51,6 +51,9 @@ let process_server() =
 
 query u: sub_t, s: salt_t, uc: usercomp_t;
   event(ServerAccepted(uc)) ==> event(ClientCommit(u, s, uc)).
+
+query u: sub_t, s: salt_t, uc: usercomp_t;
+  inj-event(ServerAccepted(uc)) ==> inj-event(ClientCommit(u, s, uc)).
 
 process
   new sub: sub_t;

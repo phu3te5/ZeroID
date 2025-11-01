@@ -1,3 +1,4 @@
+// server/config/keys.js
 const { google } = require('googleapis');
 const User = require('../models/User');
 const { generateSalt } = require('../utils/crypto');
@@ -24,27 +25,34 @@ function oauthLogin(req, res) {
 }
 
 async function oauthCallback(req, res) {
-  const { code } = req.query;
-  const { tokens } = await oauth2Client.getToken(code);
-  oauth2Client.setCredentials(tokens);
+  try {
+    const { code } = req.query;
+    const { tokens } = await oauth2Client.getToken(code);
+    oauth2Client.setCredentials(tokens);
 
-  const oauth2 = google.oauth2({ auth: oauth2Client, version: 'v2' });
-  const { data } = await oauth2.userinfo.get();
+    const oauth2 = google.oauth2({ auth: oauth2Client, version: 'v2' });
+    const { data } = await oauth2.userinfo.get();
 
-  let user = await User.findOne({ providerId: data.id });
-  if (!user) {
-    const salt = generateSalt();
-    user = await User.create({
-      provider: 'google',
-      providerId: data.id,
-      name: data.name,
-      email: data.email,
-      salt
-    });
+    let user = await User.findOne({ providerId: data.id });
+    if (!user) {
+      const salt = generateSalt();
+      user = await User.create({
+        provider: 'google',
+        providerId: data.id,
+        name: data.name,
+        email: data.email,
+        salt
+      });
+    }
+
+    const jwt = generateToken(user);
+    const encodedUser = encodeURIComponent(JSON.stringify(user));
+    // ✅ Redirect to frontend with token and user
+    res.redirect(`http://localhost:3000/?token=${jwt}&user=${encodedUser}`);
+  } catch (err) {
+    console.error('Google OAuth callback error:', err);
+    res.status(500).send('OAuth callback failed');
   }
-
-  const jwt = generateToken(user);
-  res.json({ token: jwt, user });
 }
 
 module.exports = {

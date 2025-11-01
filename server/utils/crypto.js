@@ -1,3 +1,4 @@
+//server/utils/crypto.js
 const crypto = require('crypto');
 
 function generateSalt(length = 16) {
