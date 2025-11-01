@@ -75,6 +75,8 @@ function App() {
   const [publicSignals, setPublicSignals] = useState(null);
   const [isVerified, setIsVerified] = useState(null);
   const [loading, setLoading] = useState(false);
+  // 1. New state to track if user has granted full access
+  const [hasGrantedAccess, setHasGrantedAccess] = useState(false); 
 
   const backupSaltToMPC = async (userId, salt) => {
     try {
@@ -94,6 +96,7 @@ function App() {
       console.log('Salt backup successful');
     } catch (err) {
       console.error('MPC backup failed:', err);
+      // NOTE: Using alert() is discouraged in favor of custom UI, but keeping for now.
       alert('⚠️ Salt backup failed...');
     }
   };
@@ -149,6 +152,7 @@ function App() {
     initAuth();
   }, []);
 
+  // client/src/App.js - Corrected ZK Proof generation logic
   const handleZKProof = async () => {
     if (!token || !user?.salt) {
       alert('Missing token or salt');
@@ -165,19 +169,45 @@ function App() {
       alert('Salt must be numeric!');
       return;
     }
+    
+    // Reset verification and access state when generating new proof
+    setIsVerified(null);
+    setHasGrantedAccess(false);
+
+    // --- Start Dynamic Cryptographic Input Generation ---
+
+    // The sub, iss, and aud claims are the identity inputs from the IdP.
+    // Ensure all inputs for the Circom circuit are numeric strings.
+    const sub_claim = payload.sub ? String(payload.sub).replace(/\D/g, '') : '123456';
+    const iss_claim = payload.iss || '111111'; // Placeholder/default if missing
+    const aud_claim = payload.aud || '654321'; // Placeholder/default if missing
+    
+    // T_exp (Expiration): The binding expiration from the JWT (OIDC spec).
+    const T_exp_claim = payload.exp ? String(payload.exp) : '999999';
+
+    // Ephemeral Key: Generate a random value for the verifier public key (vku).
+    const vku_ephemeral = generateRandomDecimalString(8);
+
+    // Randomness: The 'r' value (nonce_t) used in the nonce commitment.
+    const r_randomness = generateRandomDecimalString(8);
+
+    // --- End Dynamic Cryptographic Input Generation ---
 
     const inputs = {
-      sub: (payload.sub || '123456').replace(/\D/g, '') || '123456',
-      aud: '654321',
-      iss: '111111',
-      salt: user.salt,
-      vku: '999999',
-      T_exp: payload.exp ? String(payload.exp) : '999999',
-      r: generateRandomDecimalString(8),
+      // Private Witness Inputs (for Poseidon4 and Poseidon3 inside the circuit)
+      sub: sub_claim,
+      aud: aud_claim,
+      iss: iss_claim,
+      salt: user.salt, // This is the secret, unlinkable salt
+      
+      vku: vku_ephemeral,
+      T_exp: T_exp_claim,
+      r: r_randomness, 
     };
 
     setLoading(true);
     try {
+      // groth16.fullProve generates the proof and calculates the public signals (userComp and nonce)
       const { proof, publicSignals } = await groth16.fullProve(
         inputs,
         '/circuits/zklogin.wasm',
@@ -193,6 +223,7 @@ function App() {
     }
   };
 
+  // 🐛 FIX: Re-inserting the missing handleVerify function
   const handleVerify = async () => {
     if (!proof || !publicSignals) {
       alert('No proof to verify');
@@ -200,6 +231,7 @@ function App() {
     }
 
     try {
+      // Sends the proof and public signals to the server for verification
       const res = await fetch('http://localhost:3001/api/zk/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -211,6 +243,34 @@ function App() {
       console.error('Verification error:', err);
       alert('Verification failed: ' + (err.message || 'Network error'));
     }
+  };
+
+  // 2. NEW GENERIC function to handle full access for any provider
+  const handleGrantFullAccess = (provider) => {
+    setHasGrantedAccess(true);
+
+    let redirectUrl = '';
+    let serviceName = '';
+
+    if (provider === 'google') {
+        redirectUrl = 'https://myaccount.google.com/';
+        serviceName = 'Google Account Features';
+    } else if (provider === 'github') {
+        redirectUrl = 'https://github.com/settings/profile';
+        serviceName = 'GitHub Account Settings';
+    } else if (provider === 'discord') {
+        // Redirect to Discord's user settings page
+        redirectUrl = 'https://discord.com/channels/@me';
+        serviceName = 'Discord App Services';
+    } else {
+        alert('Unknown provider, cannot grant full access.');
+        setHasGrantedAccess(false);
+        return;
+    }
+    
+    // Simulate redirection to the authorized resource
+    alert(`✅ Access granted! Redirecting to full ${serviceName} to demonstrate enhanced features.`);
+    window.location.href = redirectUrl;
   };
 
   const handleRecoverSalt = async () => {
@@ -240,36 +300,39 @@ function App() {
     window.location.href = 'http://localhost:3001/api/auth/discord'; // no fake prompt
   };
 
- // This is the NEW, improved function for client/src/App.js
+  // This is the NEW, improved function for client/src/App.js
 
-const handleLogout = () => {
-  // First, figure out which provider the user logged in with.
-  // We get this from the 'user' object before we delete it.
-  const provider = user?.provider;
+  const handleLogout = () => {
+    // First, figure out which provider the user logged in with.
+    // We get this from the 'user' object before we delete it.
+    const provider = user?.provider;
 
-  // 1. Delete all of the application's data from state and local storage.
-  setUser(null);
-  setToken(null);
-  setProof(null);
-  setPublicSignals(null);
-  setIsVerified(null);
-  localStorage.removeItem('token');
-  localStorage.removeItem('user');
-  localStorage.removeItem('zkSalt');
+    // 1. Delete all of the application's data from state and local storage.
+    setUser(null);
+    setToken(null);
+    setProof(null);
+    setPublicSignals(null);
+    setIsVerified(null);
+    setHasGrantedAccess(false); // Reset access state
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('zkSalt');
 
-  // 2. Redirect the user to the correct provider to complete the logout.
-  // This is the key to restarting the login mechanism for a new user.
-  if (provider === 'github') {
-    // Redirect to GitHub's homepage. The user can sign out from the top-right menu.
-    window.location.href = 'https://github.com';
-  } else if (provider === 'discord') {
-    // Redirect to Discord's web app.
-    window.location.href = 'https://discord.com/app';
-  } else {
-    // For Google or any other case, just go back to our app's home page.
-    window.location.href = '/';
-  }
-};
+    // 2. Redirect the user to the correct provider to complete the logout.
+    // This is the key to restarting the login mechanism for a new user.
+    if (provider === 'github') {
+      // Redirect to GitHub's homepage. The user can sign out from the top-right menu.
+      window.location.href = 'https://github.com';
+    } else if (provider === 'discord') {
+      // Redirect to Discord's web app.
+      window.location.href = 'https://discord.com/app';
+    } else {
+      // For Google or any other case, just go back to our app's home page.
+      window.location.href = '/';
+    }
+  };
+
+  const supportedProviders = ['google', 'github', 'discord'];
 
   return (
     <div className="container py-5">
@@ -285,7 +348,7 @@ const handleLogout = () => {
       {user ? (
         <div className="card p-4 shadow">
           <h4>Welcome, {user.name}</h4>
-          <p><strong>Email:</strong> {user.email}</p>
+          <p>You are authenticated via zkLogin. Your identity is **private**.</p>
           <p><strong>Salt:</strong> <code>{user.salt}</code></p>
 
           <div className="mt-2">
@@ -315,19 +378,44 @@ const handleLogout = () => {
                 {JSON.stringify(publicSignals, null, 2)}
               </pre>
 
+              {/* Verify Button */}
               <button className="btn btn-success mt-3" onClick={handleVerify}>
                 Verify ZK Proof (Server)
               </button>
 
+              {/* Verification Result and Conditional Access Button */}
               {isVerified !== null && (
-                <p className="mt-2">
-                  Verification result:{' '}
-                  {isVerified ? (
-                    <span className="text-success">✅ Valid</span>
-                  ) : (
-                    <span className="text-danger">❌ Invalid</span>
+                <>
+                  <p className="mt-2">
+                    Verification result:{' '}
+                    {isVerified ? (
+                      <span className="text-success">✅ Valid</span>
+                    ) : (
+                      <span className="text-danger">❌ Invalid</span>
+                    )}
+                  </p>
+                  
+                  {/* 3. Generic Conditional access grant button for any supported provider */}
+                  {isVerified && !hasGrantedAccess && supportedProviders.includes(user.provider) && (
+                    <div className="mt-3 p-3 bg-light rounded border border-primary">
+                      <p className="mb-2 fw-bold">Enhance Features ({user.provider.toUpperCase()}):</p>
+                      <p className="text-muted small mb-2">
+                        Your identity is private via zkLogin, but you can optionally grant access to your full {user.provider} services to unlock all app features.
+                      </p>
+                      <button 
+                        className="btn btn-info btn-sm"
+                        onClick={() => handleGrantFullAccess(user.provider)}
+                      >
+                        Grant Full {user.provider} Access
+                      </button>
+                    </div>
                   )}
-                </p>
+                  {isVerified && hasGrantedAccess && (
+                    <div className="mt-3 alert alert-success">
+                      Full {user.provider} Access Granted!
+                    </div>
+                  )}
+                </>
               )}
             </>
           )}
