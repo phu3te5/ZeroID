@@ -1,9 +1,25 @@
-# Ignore generated WebAssembly files (from Circom)
-*.wasm linguist-vendored
+# IGNORE GENERATED AND VENDOR CODE (THE NOISE)
 
-# Ignore common generated/compiled JavaScript files (from React/Node/Circom output)
+# 1. Circom and Circuit Output (Likely location of your WASM)
+circuits-dev/** linguist-vendored
+*.wasm linguist-vendored
 *.js linguist-vendored
 *.min.js linguist-vendored
+/build/** linguist-vendored
+/dist/** linguist-vendored
 
-# Ignore vendor/third-party dependencies (like Node.js libraries)
-node_modules/ linguist-vendored
+# 2. Node.js Dependencies and Lock Files
+node_modules/** linguist-vendored
+package-lock.json linguist-vendored
+
+# 3. ProVerif Archive (Large, external dependency)
+proverif2.05.tar.gz linguist-vendored
+
+# FORCE RECOGNITION (THE LANGUAGES YOU WROTE)
+
+# Circom Source
+*.circom linguist-language=Circom
+
+# ProVerif Source
+*.pv linguist-language=ProVerif
+*.pvl linguist-language=ProVerif
