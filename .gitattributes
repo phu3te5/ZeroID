@@ -1,3 +1,9 @@
-# Ignore generated WebAssembly and JavaScript files from language stats
+# Ignore generated WebAssembly files (from Circom)
 *.wasm linguist-vendored
+
+# Ignore common generated/compiled JavaScript files (from React/Node/Circom output)
 *.js linguist-vendored
+*.min.js linguist-vendored
+
+# Ignore vendor/third-party dependencies (like Node.js libraries)
+node_modules/ linguist-vendored
