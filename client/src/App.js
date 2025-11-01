@@ -1,9 +1,9 @@
 // client/src/App.js
 import React, { useEffect, useState } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { BlockMath } from 'react-katex';
+import { InlineMath } from 'react-katex'; // Using InlineMath for better fit in labels
 import 'katex/dist/katex.min.css';
-import './App.css'; // Assume custom CSS for colors/fonts here
+import './App.css'; 
 import { groth16 } from 'snarkjs';
 
 // --- Utility Functions (Left unchanged for core logic) ---
@@ -82,6 +82,110 @@ function App() {
   const [isVerified, setIsVerified] = useState(null);
   const [loading, setLoading] = useState(false);
   const [hasGrantedAccess, setHasGrantedAccess] = useState(false); 
+  const [scrollPosition, setScrollPosition] = useState(0); 
+
+  // New scroll handler and useEffect for dynamic effects
+  const handleScroll = () => {
+    setScrollPosition(window.pageYOffset);
+  };
+
+  useEffect(() => {
+    window.addEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []); 
+
+  // Calculate dynamic header style based on scroll position
+  const headerOpacity = Math.max(0.7, 1 - scrollPosition / 250);
+  const headerScale = Math.max(0.95, 1 - scrollPosition / 1500);
+  const headerStyle = {
+    opacity: headerOpacity,
+    transform: `scale(${headerScale})`,
+    transition: 'all 0.3s ease-out',
+    transformOrigin: 'center top',
+    willChange: 'transform, opacity' 
+  };
+  
+  // Custom Scrollbar and THEME CSS for the feminine/wellness product site look
+  const ScrollbarStyle = () => (
+    <style dangerouslySetInnerHTML={{__html: `
+      /* Theme Colors */
+      :root {
+          --color-primary: #884A5C; /* Deep Berry/Wine */
+          --color-secondary: #B4CFB0; /* Muted Sage Green (Success/ZK Verified) */
+          --color-background: #F9F5F6; /* Soft Blush/Cream */
+          --color-dark: #3E3B3C;
+      }
+
+      /* --- Background Animation --- */
+      @keyframes softGradient {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+      }
+
+      body {
+          /* Subtle Gradient Background */
+          background: linear-gradient(-45deg, var(--color-background), #FFFFFF, #F0E8E9);
+          background-size: 400% 400%;
+          animation: softGradient 15s ease infinite;
+      }
+
+      /* Custom Scrollbar for 'Funny Scroll' Effect */
+      ::-webkit-scrollbar {
+        width: 10px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #fdf2f8; /* Light blush track */
+        border-radius: 5px;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--color-primary); 
+        border-radius: 5px;
+        transition: background 0.3s ease;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #643846; /* Darker berry hover */
+      }
+
+      /* Button Styles */
+      .btn-custom-primary {
+          background-color: var(--color-primary);
+          border-color: var(--color-primary);
+          color: white;
+      }
+      .btn-custom-primary:hover {
+          background-color: #643846;
+          border-color: #643846;
+          transform: translateY(-2px);
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+      
+      /* Specific Dynamic Hover for Google Button */
+      .btn-google-dynamic {
+          background-color: #DB4437; /* Google Red */
+          border: none;
+          transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+      }
+      .btn-google-dynamic:hover {
+          background-color: #C1392D;
+          /* Dynamic lift and shadow glow */
+          transform: translateY(-4px); 
+          box-shadow: 0 10px 20px rgba(219, 68, 55, 0.5); 
+      }
+      .card-themed {
+          border-color: var(--color-primary) !important;
+      }
+      .text-themed-primary {
+          color: var(--color-primary) !important;
+      }
+      .badge-themed-success {
+          background-color: var(--color-secondary) !important;
+          color: var(--color-dark) !important;
+      }
+    `}} />
+  );
 
   const backupSaltToMPC = async (userId, salt) => {
     try {
@@ -307,13 +411,17 @@ function App() {
   const supportedProviders = ['google', 'github', 'discord'];
 
   return (
-    <div className="container py-5 d-flex flex-column align-items-center" style={{ minHeight: '100vh', backgroundColor: '#f4f7f6' }}>
-      <div style={{ maxWidth: '600px', width: '100%' }}>
-        <h1 className="mb-4 text-center fw-bolder text-primary">zkLogin Frontend</h1>
-        <p className="text-center text-muted mb-4">
+    <div className="container py-5 d-flex flex-column align-items-center" style={{ minHeight: '100vh', paddingBottom: '100px' }}>
+      <ScrollbarStyle /> 
+      
+      <div className="text-center mb-4" style={headerStyle}>
+        <h1 className="fw-bolder text-themed-primary">zkLogin Frontend</h1>
+        <p className="text-muted">
           Client-Side Zero-Knowledge Proof (NIZK Groth16) Authentication Demo
         </p>
+      </div>
 
+      <div style={{ maxWidth: '600px', width: '100%' }}>
         {!user && (
           <div className="alert alert-info border-info mb-4 shadow-sm text-center">
             <strong>Note:</strong> To log in with a different GitHub or Discord account, 
@@ -329,22 +437,22 @@ function App() {
           <ul className="list-group list-group-flush">
             <li className="list-group-item d-flex justify-content-between align-items-center small">
               <span>**Unforgeability** (Authentication Correspondence)</span>
-              <span className="badge bg-success py-2">PROVEN</span>
+              <span className="badge badge-themed-success py-2">PROVEN</span>
             </li>
             <li className="list-group-item d-flex justify-content-between align-items-center small">
               <span>**Unlinkability** (Salt Secrecy)</span>
-              <span className="badge bg-success py-2">PROVEN</span>
+              <span className="badge badge-themed-success py-2">PROVEN</span>
             </li>
             <li className="list-group-item d-flex justify-content-between align-items-center small">
               <span>**Replay Resistance** (via Ephemeral Nonce)</span>
-              <span className="badge bg-success py-2">PROVEN</span>
+              <span className="badge badge-themed-success py-2">PROVEN</span>
             </li>
           </ul>
         </div>
 
         {user ? (
-          <div className="card p-4 shadow-lg border-2 border-success">
-            <h4 className="card-title text-success mb-3">Welcome Back, {user.name}</h4>
+          <div className="card p-4 shadow-lg border-2" style={{borderColor: 'var(--color-secondary)'}}>
+            <h4 className="card-title text-themed-primary mb-3">Welcome Back, {user.name}</h4>
             
             <div className="mb-3 p-3 bg-light rounded small border">
                 <p className="mb-1">Authenticated Provider: <span className="fw-bold text-dark">{user.provider.toUpperCase()}</span></p>
@@ -354,7 +462,7 @@ function App() {
 
             <div className="d-flex flex-wrap gap-2 mb-4">
               <button
-                className="btn btn-primary flex-grow-1"
+                className="btn btn-custom-primary flex-grow-1"
                 onClick={handleZKProof}
                 disabled={loading}
               >
@@ -370,11 +478,11 @@ function App() {
 
             {proof && (
               <div className="mt-3">
-                <h5 className="text-primary border-bottom pb-1">Proof Status & Verification</h5>
+                <h5 className="text-themed-primary border-bottom pb-1">Proof Status & Verification</h5>
                 
                 <div className="row mb-3">
                     <div className="col-md-6 mb-2">
-                        <small className="d-block fw-bold mb-1"> ZK Proof (<BlockMath math="\pi_{zk}" />) </small>
+                        <small className="d-block fw-bold mb-1">ZK Proof (<InlineMath math="\pi_{zk}" />)</small> 
                         <pre className="bg-dark text-white p-2 rounded small overflow-auto" style={{ maxHeight: '150px' }}>
                             {JSON.stringify(proof, null, 2)}
                         </pre>
@@ -389,11 +497,11 @@ function App() {
 
                 {/* Verification Button and Result */}
                 <div className="d-flex align-items-center justify-content-between">
-                    <button className="btn btn-success flex-grow-1 me-3" onClick={handleVerify}>
+                    <button className="btn btn-success flex-grow-1 me-3" onClick={handleVerify} style={{backgroundColor: 'var(--color-secondary)', borderColor: 'var(--color-secondary)', color: 'var(--color-dark)'}}>
                         Verify ZK Proof (Server-Side)
                     </button>
                     {isVerified !== null && (
-                        <span className={`badge fs-6 ${isVerified ? 'bg-success' : 'bg-danger'}`}>
+                        <span className={`badge fs-6 ${isVerified ? 'badge-themed-success' : 'bg-danger'}`}>
                             {isVerified ? '✅ VALID' : '❌ INVALID'}
                         </span>
                     )}
@@ -401,7 +509,7 @@ function App() {
 
                 {/* Conditional Full Access Section */}
                 {isVerified === true && !hasGrantedAccess && supportedProviders.includes(user.provider) && (
-                  <div className="mt-4 p-3 bg-warning-subtle rounded border border-warning">
+                  <div className="mt-4 p-3 rounded border border-warning" style={{backgroundColor: '#F7E6E9'}}>
                     <p className="mb-2 fw-bold text-dark">Grant Enhanced Access ({user.provider.toUpperCase()}):</p>
                     <p className="text-muted small mb-2">
                       Unlock full features by linking your complete {user.provider} identity. This moves from private ZK access to standard OAuth-based resource access.
@@ -410,12 +518,12 @@ function App() {
                       className="btn btn-warning btn-sm"
                       onClick={() => handleGrantFullAccess(user.provider)}
                     >
-                      <span className="me-1">🔓</span> Grant Full {user.provider.toUpperCase()} Access
+                      <span className="me-1">🔓</span> Grant Full Access
                     </button>
                   </div>
                 )}
                 {isVerified === true && hasGrantedAccess && (
-                  <div className="mt-3 alert alert-success d-flex align-items-center">
+                  <div className="mt-3 alert d-flex align-items-center" style={{backgroundColor: 'var(--color-secondary)', color: 'var(--color-dark)', borderColor: 'var(--color-secondary)'}}>
                     <span className="fs-5 me-2">⭐</span>Full {user.provider} Access Granted!
                   </div>
                 )}
@@ -427,9 +535,10 @@ function App() {
             </button>
           </div>
         ) : (
-          <div className="d-flex flex-column gap-3 p-4 bg-white rounded shadow-lg border">
-            <h5 className="text-center text-secondary mb-3">Authenticate with Provider:</h5>
-            <button className="btn btn-danger btn-lg shadow-sm" onClick={handleLoginGoogle}>
+          <div className="d-flex flex-column gap-3 p-4 bg-white rounded shadow-lg border card-themed">
+            <h5 className="text-center text-themed-primary mb-3">Authenticate with Provider:</h5>
+            {/* Google Button with Dynamic Hover */}
+            <button className="btn btn-google-dynamic btn-lg shadow-sm" onClick={handleLoginGoogle}>
               Login with Google
             </button>
             <button className="btn btn-dark btn-lg shadow-sm" onClick={handleLoginGithub}>

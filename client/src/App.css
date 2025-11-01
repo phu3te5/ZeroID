@@ -1,46 +1,155 @@
-/* Custom styles to enhance Bootstrap */
+/* client/src/App.css */
+@import url('https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap');
+
+/* --- Theme Colors (from your code) --- */
+:root {
+  --color-primary: #884a5c; /* Deep Berry/Wine */
+  --color-secondary: #b4cfb0; /* Muted Sage Green (Success/ZK Verified) */
+  --color-background: #f9f5f6; /* Soft Blush/Cream */
+  --color-dark: #3e3b3c;
+}
+
+/* --- Background Animation (from your code) --- */
+@keyframes softGradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
 body {
-  background-color: #f8f9fa;
+  font-family: 'Lato', sans-serif;
+  background: linear-gradient(-45deg, var(--color-background), #ffffff, #f0e8e9);
+  background-size: 400% 400%;
+  animation: softGradient 15s ease infinite;
 }
 
-.user-info {
-  border-left: 4px solid #0d6efd;
+/* --- Main App Layout --- */
+.app-container {
+  min-height: 100vh;
+  padding-bottom: 100px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 5rem;
 }
 
-pre {
-  max-height: 300px;
-  overflow-y: auto;
+.main-content {
+  max-width: 600px;
+  width: 100%;
 }
 
-/* Social login button styles */
-.btn-google {
-  background-color: #DB4437;
+/* --- Custom Scrollbar (from your code) --- */
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #fdf2f8;
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-primary);
+  border-radius: 5px;
+  transition: background 0.3s ease;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #643846;
+}
+
+/* --- Soft Shadow Class --- */
+.shadow-soft {
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05) !important;
+  border-width: 1px !important;
+}
+
+/* --- Button Styles (from your code) --- */
+.btn-custom-primary {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
   color: white;
+  transition: all 0.3s ease;
+}
+.btn-custom-primary:hover {
+  background-color: #643846;
+  border-color: #643846;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+.btn-google-dynamic {
+  background-color: #db4437;
+  border: none;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+.btn-google-dynamic:hover {
+  background-color: #c1392d;
+  transform: translateY(-4px);
+  box-shadow: 0 10px 20px rgba(219, 68, 55, 0.5);
 }
 
-.btn-github {
-  background-color: #333;
-  color: white;
+/* --- Themed Components --- */
+.card-themed {
+  border-color: var(--color-primary) !important;
+}
+.text-themed-primary {
+  color: var(--color-primary) !important;
+}
+.badge-themed-success {
+  background-color: var(--color-secondary) !important;
+  color: var(--color-dark) !important;
 }
 
-.btn-discord {
-  background-color: #5865F2;
-  color: white;
+/* 💡 NEW: Themed Security Card (replaces bg-dark) */
+.card-security-themed {
+  border: 1px solid var(--color-primary);
+  background-color: #fff;
+}
+.card-security-themed .card-header {
+  background-color: var(--color-background);
+  color: var(--color-primary);
+  border-bottom: 1px solid var(--color-primary);
+}
+.card-security-themed .list-group-item {
+  background-color: #fff;
 }
 
-.btn-google:hover, .btn-github:hover, .btn-discord:hover {
-  color: white;
-  opacity: 0.9;
+/* 💡 NEW: Themed <pre> blocks (replaces bg-dark) */
+.pre-themed {
+  background-color: var(--color-background);
+  color: var(--color-dark);
+  padding: 10px;
+  border-radius: 5px;
+  border: 1px solid #eee;
+  max-height: 150px;
+  overflow: auto;
+  font-size: 0.8rem;
 }
 
-/* Responsive adjustments */
-@media (max-width: 576px) {
-  .auth-buttons .d-flex {
-    flex-direction: column;
-  }
-  
-  .d-flex.gap-2 {
-    flex-direction: column;
-    gap: 0.5rem !important;
-  }
+/* 💡 NEW: Themed info alert */
+.alert-info-themed {
+  color: var(--color-dark);
+  background-color: #fdf2f8;
+  border-color: var(--color-primary);
+}
+
+/* 💡 NEW: Themed light background */
+.bg-light-themed {
+  background-color: var(--color-background) !important;
+}
+
+/* 💡 NEW: Verification Status Styling */
+.verify-status {
+  padding: 0.75rem 1rem;
+  margin-top: 1rem;
+  border-radius: 0.25rem;
+  font-weight: 700;
+  text-align: center;
+}
+.verify-status.verified {
+  background-color: var(--color-secondary);
+  color: var(--color-dark);
+  border: 1px solid #9fc09b;
+}
+.verify-status.invalid {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
 }
