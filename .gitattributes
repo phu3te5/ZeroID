@@ -1,0 +1,3 @@
+# Ignore generated WebAssembly and JavaScript files from language stats
+*.wasm linguist-vendored
+*.js linguist-vendored
