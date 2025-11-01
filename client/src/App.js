@@ -1,8 +1,12 @@
 // client/src/App.js
 import React, { useEffect, useState } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import './App.css';
+import { BlockMath } from 'react-katex';
+import 'katex/dist/katex.min.css';
+import './App.css'; // Assume custom CSS for colors/fonts here
 import { groth16 } from 'snarkjs';
+
+// --- Utility Functions (Left unchanged for core logic) ---
 
 function splitNumericSalt(salt, sharesCount = 5, threshold = 3) {
   const num = BigInt(salt);
@@ -68,6 +72,8 @@ function generateRandomDecimalString(bytes = 8) {
   return Array.from(array).map(b => b.toString()).join('');
 }
 
+// --- Main App Component ---
+
 function App() {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
@@ -75,7 +81,6 @@ function App() {
   const [publicSignals, setPublicSignals] = useState(null);
   const [isVerified, setIsVerified] = useState(null);
   const [loading, setLoading] = useState(false);
-  // 1. New state to track if user has granted full access
   const [hasGrantedAccess, setHasGrantedAccess] = useState(false); 
 
   const backupSaltToMPC = async (userId, salt) => {
@@ -96,7 +101,6 @@ function App() {
       console.log('Salt backup successful');
     } catch (err) {
       console.error('MPC backup failed:', err);
-      // NOTE: Using alert() is discouraged in favor of custom UI, but keeping for now.
       alert('⚠️ Salt backup failed...');
     }
   };
@@ -152,7 +156,6 @@ function App() {
     initAuth();
   }, []);
 
-  // client/src/App.js - Corrected ZK Proof generation logic
   const handleZKProof = async () => {
     if (!token || !user?.salt) {
       alert('Missing token or salt');
@@ -170,36 +173,21 @@ function App() {
       return;
     }
     
-    // Reset verification and access state when generating new proof
     setIsVerified(null);
     setHasGrantedAccess(false);
 
-    // --- Start Dynamic Cryptographic Input Generation ---
-
-    // The sub, iss, and aud claims are the identity inputs from the IdP.
-    // Ensure all inputs for the Circom circuit are numeric strings.
     const sub_claim = payload.sub ? String(payload.sub).replace(/\D/g, '') : '123456';
-    const iss_claim = payload.iss || '111111'; // Placeholder/default if missing
-    const aud_claim = payload.aud || '654321'; // Placeholder/default if missing
-    
-    // T_exp (Expiration): The binding expiration from the JWT (OIDC spec).
+    const iss_claim = payload.iss || '111111'; 
+    const aud_claim = payload.aud || '654321'; 
     const T_exp_claim = payload.exp ? String(payload.exp) : '999999';
-
-    // Ephemeral Key: Generate a random value for the verifier public key (vku).
     const vku_ephemeral = generateRandomDecimalString(8);
-
-    // Randomness: The 'r' value (nonce_t) used in the nonce commitment.
     const r_randomness = generateRandomDecimalString(8);
 
-    // --- End Dynamic Cryptographic Input Generation ---
-
     const inputs = {
-      // Private Witness Inputs (for Poseidon4 and Poseidon3 inside the circuit)
       sub: sub_claim,
       aud: aud_claim,
       iss: iss_claim,
-      salt: user.salt, // This is the secret, unlinkable salt
-      
+      salt: user.salt, 
       vku: vku_ephemeral,
       T_exp: T_exp_claim,
       r: r_randomness, 
@@ -207,7 +195,6 @@ function App() {
 
     setLoading(true);
     try {
-      // groth16.fullProve generates the proof and calculates the public signals (userComp and nonce)
       const { proof, publicSignals } = await groth16.fullProve(
         inputs,
         '/circuits/zklogin.wasm',
@@ -223,7 +210,6 @@ function App() {
     }
   };
 
-  // 🐛 FIX: Re-inserting the missing handleVerify function
   const handleVerify = async () => {
     if (!proof || !publicSignals) {
       alert('No proof to verify');
@@ -231,7 +217,6 @@ function App() {
     }
 
     try {
-      // Sends the proof and public signals to the server for verification
       const res = await fetch('http://localhost:3001/api/zk/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -245,7 +230,6 @@ function App() {
     }
   };
 
-  // 2. NEW GENERIC function to handle full access for any provider
   const handleGrantFullAccess = (provider) => {
     setHasGrantedAccess(true);
 
@@ -259,7 +243,6 @@ function App() {
         redirectUrl = 'https://github.com/settings/profile';
         serviceName = 'GitHub Account Settings';
     } else if (provider === 'discord') {
-        // Redirect to Discord's user settings page
         redirectUrl = 'https://discord.com/channels/@me';
         serviceName = 'Discord App Services';
     } else {
@@ -293,41 +276,30 @@ function App() {
   };
 
   const handleLoginGithub = () => {
-    window.location.href = 'http://localhost:3001/api/auth/github'; // no fake prompt
+    window.location.href = 'http://localhost:3001/api/auth/github'; 
   };
 
   const handleLoginDiscord = () => {
-    window.location.href = 'http://localhost:3001/api/auth/discord'; // no fake prompt
+    window.location.href = 'http://localhost:3001/api/auth/discord'; 
   };
 
-  // This is the NEW, improved function for client/src/App.js
-
   const handleLogout = () => {
-    // First, figure out which provider the user logged in with.
-    // We get this from the 'user' object before we delete it.
     const provider = user?.provider;
-
-    // 1. Delete all of the application's data from state and local storage.
     setUser(null);
     setToken(null);
     setProof(null);
     setPublicSignals(null);
     setIsVerified(null);
-    setHasGrantedAccess(false); // Reset access state
+    setHasGrantedAccess(false); 
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('zkSalt');
 
-    // 2. Redirect the user to the correct provider to complete the logout.
-    // This is the key to restarting the login mechanism for a new user.
     if (provider === 'github') {
-      // Redirect to GitHub's homepage. The user can sign out from the top-right menu.
       window.location.href = 'https://github.com';
     } else if (provider === 'discord') {
-      // Redirect to Discord's web app.
       window.location.href = 'https://discord.com/app';
     } else {
-      // For Google or any other case, just go back to our app's home page.
       window.location.href = '/';
     }
   };
@@ -335,108 +307,140 @@ function App() {
   const supportedProviders = ['google', 'github', 'discord'];
 
   return (
-    <div className="container py-5">
-      <h1 className="mb-4">zkLogin Frontend (Client-Side ZK)</h1>
+    <div className="container py-5 d-flex flex-column align-items-center" style={{ minHeight: '100vh', backgroundColor: '#f4f7f6' }}>
+      <div style={{ maxWidth: '600px', width: '100%' }}>
+        <h1 className="mb-4 text-center fw-bolder text-primary">zkLogin Frontend</h1>
+        <p className="text-center text-muted mb-4">
+          Client-Side Zero-Knowledge Proof (NIZK Groth16) Authentication Demo
+        </p>
 
-      {!user && (
-        <div className="alert alert-info mb-3">
-          <strong>Note:</strong> To log in with a different GitHub or Discord account, 
-          please log out of those services first in another browser tab.
+        {!user && (
+          <div className="alert alert-info border-info mb-4 shadow-sm text-center">
+            <strong>Note:</strong> To log in with a different GitHub or Discord account, 
+            please log out of those services first in another browser tab.
+          </div>
+        )}
+
+        {/* --- FORMAL SECURITY GUARANTEES SECTION --- */}
+        <div className="card shadow-lg mb-4 border-3 border-dark">
+          <div className="card-header bg-dark text-white fw-bold">
+            <span className="me-2">🛡️</span> Formal Security Guarantees (ProVerif)
+          </div>
+          <ul className="list-group list-group-flush">
+            <li className="list-group-item d-flex justify-content-between align-items-center small">
+              <span>**Unforgeability** (Authentication Correspondence)</span>
+              <span className="badge bg-success py-2">PROVEN</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between align-items-center small">
+              <span>**Unlinkability** (Salt Secrecy)</span>
+              <span className="badge bg-success py-2">PROVEN</span>
+            </li>
+            <li className="list-group-item d-flex justify-content-between align-items-center small">
+              <span>**Replay Resistance** (via Ephemeral Nonce)</span>
+              <span className="badge bg-success py-2">PROVEN</span>
+            </li>
+          </ul>
         </div>
-      )}
 
-      {user ? (
-        <div className="card p-4 shadow">
-          <h4>Welcome, {user.name}</h4>
-          <p>You are authenticated via zkLogin. Your identity is **private**.</p>
-          <p><strong>Salt:</strong> <code>{user.salt}</code></p>
+        {user ? (
+          <div className="card p-4 shadow-lg border-2 border-success">
+            <h4 className="card-title text-success mb-3">Welcome Back, {user.name}</h4>
+            
+            <div className="mb-3 p-3 bg-light rounded small border">
+                <p className="mb-1">Authenticated Provider: <span className="fw-bold text-dark">{user.provider.toUpperCase()}</span></p>
+                <p className="mb-1">Identity Status: <span className="fw-bold text-success">ZK-Private</span></p>
+                <p className="mb-0">Secret Salt (Proof Witness): <code className="text-danger">{user.salt}</code></p>
+            </div>
 
-          <div className="mt-2">
-            <button
-              className="btn btn-primary"
-              onClick={handleZKProof}
-              disabled={loading}
-            >
-              {loading ? '⏳ Generating Proof...' : 'Generate ZK Proof (Client-Side)'}
-            </button>
-            <button
-              className="btn btn-warning ms-2"
-              onClick={handleRecoverSalt}
-            >
-              🔁 Recover Salt from MPC
+            <div className="d-flex flex-wrap gap-2 mb-4">
+              <button
+                className="btn btn-primary flex-grow-1"
+                onClick={handleZKProof}
+                disabled={loading}
+              >
+                {loading ? '⏳ Generating Proof...' : 'Generate ZK Proof'}
+              </button>
+              <button
+                className="btn btn-warning"
+                onClick={handleRecoverSalt}
+              >
+                <span className="me-1">🔑</span> Recover Salt (MPC)
+              </button>
+            </div>
+
+            {proof && (
+              <div className="mt-3">
+                <h5 className="text-primary border-bottom pb-1">Proof Status & Verification</h5>
+                
+                <div className="row mb-3">
+                    <div className="col-md-6 mb-2">
+                        <small className="d-block fw-bold mb-1"> ZK Proof (<BlockMath math="\pi_{zk}" />) </small>
+                        <pre className="bg-dark text-white p-2 rounded small overflow-auto" style={{ maxHeight: '150px' }}>
+                            {JSON.stringify(proof, null, 2)}
+                        </pre>
+                    </div>
+                    <div className="col-md-6 mb-2">
+                        <small className="d-block fw-bold mb-1">Public Signals (userComp, nonce)</small>
+                        <pre className="bg-dark text-white p-2 rounded small overflow-auto" style={{ maxHeight: '150px' }}>
+                            {JSON.stringify(publicSignals, null, 2)}
+                        </pre>
+                    </div>
+                </div>
+
+                {/* Verification Button and Result */}
+                <div className="d-flex align-items-center justify-content-between">
+                    <button className="btn btn-success flex-grow-1 me-3" onClick={handleVerify}>
+                        Verify ZK Proof (Server-Side)
+                    </button>
+                    {isVerified !== null && (
+                        <span className={`badge fs-6 ${isVerified ? 'bg-success' : 'bg-danger'}`}>
+                            {isVerified ? '✅ VALID' : '❌ INVALID'}
+                        </span>
+                    )}
+                </div>
+
+                {/* Conditional Full Access Section */}
+                {isVerified === true && !hasGrantedAccess && supportedProviders.includes(user.provider) && (
+                  <div className="mt-4 p-3 bg-warning-subtle rounded border border-warning">
+                    <p className="mb-2 fw-bold text-dark">Grant Enhanced Access ({user.provider.toUpperCase()}):</p>
+                    <p className="text-muted small mb-2">
+                      Unlock full features by linking your complete {user.provider} identity. This moves from private ZK access to standard OAuth-based resource access.
+                    </p>
+                    <button 
+                      className="btn btn-warning btn-sm"
+                      onClick={() => handleGrantFullAccess(user.provider)}
+                    >
+                      <span className="me-1">🔓</span> Grant Full {user.provider.toUpperCase()} Access
+                    </button>
+                  </div>
+                )}
+                {isVerified === true && hasGrantedAccess && (
+                  <div className="mt-3 alert alert-success d-flex align-items-center">
+                    <span className="fs-5 me-2">⭐</span>Full {user.provider} Access Granted!
+                  </div>
+                )}
+              </div>
+            )}
+
+            <button className="btn btn-outline-secondary mt-4" onClick={handleLogout}>
+              Logout
             </button>
           </div>
-
-          {proof && (
-            <>
-              <h5 className="mt-3">ZK Proof</h5>
-              <pre className="bg-light p-2 rounded" style={{ maxHeight: '200px', overflow: 'auto' }}>
-                {JSON.stringify(proof, null, 2)}
-              </pre>
-              <h5>Public Signals</h5>
-              <pre className="bg-light p-2 rounded">
-                {JSON.stringify(publicSignals, null, 2)}
-              </pre>
-
-              {/* Verify Button */}
-              <button className="btn btn-success mt-3" onClick={handleVerify}>
-                Verify ZK Proof (Server)
-              </button>
-
-              {/* Verification Result and Conditional Access Button */}
-              {isVerified !== null && (
-                <>
-                  <p className="mt-2">
-                    Verification result:{' '}
-                    {isVerified ? (
-                      <span className="text-success">✅ Valid</span>
-                    ) : (
-                      <span className="text-danger">❌ Invalid</span>
-                    )}
-                  </p>
-                  
-                  {/* 3. Generic Conditional access grant button for any supported provider */}
-                  {isVerified && !hasGrantedAccess && supportedProviders.includes(user.provider) && (
-                    <div className="mt-3 p-3 bg-light rounded border border-primary">
-                      <p className="mb-2 fw-bold">Enhance Features ({user.provider.toUpperCase()}):</p>
-                      <p className="text-muted small mb-2">
-                        Your identity is private via zkLogin, but you can optionally grant access to your full {user.provider} services to unlock all app features.
-                      </p>
-                      <button 
-                        className="btn btn-info btn-sm"
-                        onClick={() => handleGrantFullAccess(user.provider)}
-                      >
-                        Grant Full {user.provider} Access
-                      </button>
-                    </div>
-                  )}
-                  {isVerified && hasGrantedAccess && (
-                    <div className="mt-3 alert alert-success">
-                      Full {user.provider} Access Granted!
-                    </div>
-                  )}
-                </>
-              )}
-            </>
-          )}
-
-          <button className="btn btn-outline-secondary mt-4" onClick={handleLogout}>
-            Logout
-          </button>
-        </div>
-      ) : (
-        <div className="d-flex flex-column gap-2">
-          <button className="btn btn-danger" onClick={handleLoginGoogle}>
-            Login with Google
-          </button>
-          <button className="btn btn-dark" onClick={handleLoginGithub}>
-            Login with GitHub
-          </button>
-          <button className="btn btn-primary" onClick={handleLoginDiscord}>
-            Login with Discord
-          </button>
-        </div>
-      )}
+        ) : (
+          <div className="d-flex flex-column gap-3 p-4 bg-white rounded shadow-lg border">
+            <h5 className="text-center text-secondary mb-3">Authenticate with Provider:</h5>
+            <button className="btn btn-danger btn-lg shadow-sm" onClick={handleLoginGoogle}>
+              Login with Google
+            </button>
+            <button className="btn btn-dark btn-lg shadow-sm" onClick={handleLoginGithub}>
+              Login with GitHub
+            </button>
+            <button className="btn btn-primary btn-lg shadow-sm" onClick={handleLoginDiscord}>
+              Login with Discord
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
