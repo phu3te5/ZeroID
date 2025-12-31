@@ -18,7 +18,7 @@ This server is stateless regarding user credentials—it never sees or stores pa
 
 ## 📂 Project Structure
 
-\`\`\`bash
+
 server/
 ├── circuits/               # Cryptographic Artifacts
 │   ├── zklogin.wasm        # Circuit Logic (WASM)
@@ -36,7 +36,7 @@ server/
 ├── .env                    # Environment Variables
 ├── server.js               # Entry Point
 └── README.md               # Documentation
-\`\`\`
+
 
 ---
 
