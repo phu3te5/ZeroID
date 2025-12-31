@@ -16,29 +16,6 @@ This server is stateless regarding user credentials—it never sees or stores pa
 
 ---
 
-## 📂 Project Structure
-
-
-server/
-├── circuits/               # Cryptographic Artifacts
-│   ├── zklogin.wasm        # Circuit Logic (WASM)
-│   ├── zklogin_final.zkey  # Proving Key (Powers of Tau)
-│   └── verification_key.json # Verification Key (Public)
-├── controllers/
-│   ├── authController.js   # Handles OIDC & ZKP Verification
-│   └── mpcController.js    # Handles Shamir Secret Sharing
-├── models/
-│   └── User.js             # User Schema (Non-custodial)
-├── routes/
-│   ├── auth.js             # Auth Routes (/api/auth)
-│   ├── mpc.js              # MPC Routes (/api/mpc)
-│   └── zk.js               # Zero-Knowledge Verification (/api/zk)
-├── .env                    # Environment Variables
-├── server.js               # Entry Point
-└── README.md               # Documentation
-
-
----
 
 ## 🔌 API Endpoints
 
