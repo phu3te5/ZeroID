@@ -1,2 +1,0 @@
-File "zklogin_secure.pv", line 24, character 26:
-Error: Syntax error.
