@@ -1,12 +1,11 @@
 // client/src/App.js
 import React, { useEffect, useState } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { InlineMath } from 'react-katex'; // Using InlineMath for better fit in labels
 import 'katex/dist/katex.min.css';
 import './App.css'; 
 import { groth16 } from 'snarkjs';
 
-// --- Utility Functions (Left unchanged for core logic) ---
+// --- Utility Functions ---
 
 function splitNumericSalt(salt, sharesCount = 5, threshold = 3) {
   const num = BigInt(salt);
@@ -30,15 +29,12 @@ function combineNumericShares(shares) {
   const [x1, y1] = points[0];
   const [x2, y2] = points[1];
   const [x3, y3] = points[2];
-
   const denom1 = (x1 - x2) * (x1 - x3);
   const denom2 = (x2 - x1) * (x2 - x3);
   const denom3 = (x3 - x1) * (x3 - x2);
-
   const term1 = y1 * x2 * x3 / denom1;
   const term2 = y2 * x1 * x3 / denom2;
   const term3 = y3 * x1 * x2 / denom3;
-
   const secret = term1 + term2 + term3;
   return secret.toString();
 }
@@ -73,7 +69,6 @@ function generateRandomDecimalString(bytes = 8) {
 }
 
 // --- Main App Component ---
-
 function App() {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
@@ -81,149 +76,223 @@ function App() {
   const [publicSignals, setPublicSignals] = useState(null);
   const [isVerified, setIsVerified] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [hasGrantedAccess, setHasGrantedAccess] = useState(false); 
-  const [scrollPosition, setScrollPosition] = useState(0); 
+  const [hasGrantedAccess, setHasGrantedAccess] = useState(false);
+  const [activeTab, setActiveTab] = useState('proof');
+  const [scrollProgress, setScrollProgress] = useState(0);
 
-  // New scroll handler and useEffect for dynamic effects
-  const handleScroll = () => {
-    setScrollPosition(window.pageYOffset);
-  };
-
-  useEffect(() => {
-    window.addEventListener('scroll', handleScroll);
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-    };
-  }, []); 
-
-  // Calculate dynamic header style based on scroll position
-  const headerOpacity = Math.max(0.7, 1 - scrollPosition / 250);
-  const headerScale = Math.max(0.95, 1 - scrollPosition / 1500);
-  const headerStyle = {
-    opacity: headerOpacity,
-    transform: `scale(${headerScale})`,
-    transition: 'all 0.3s ease-out',
-    transformOrigin: 'center top',
-    willChange: 'transform, opacity' 
-  };
-  
-  // Custom Scrollbar and THEME CSS for the feminine/wellness product site look
-  const ScrollbarStyle = () => (
+  // --- Visual & Theme Logic ---
+  const ThemeStyles = () => (
     <style dangerouslySetInnerHTML={{__html: `
-      /* Theme Colors */
-      :root {
-          --color-primary: #884A5C; /* Deep Berry/Wine */
-          --color-secondary: #B4CFB0; /* Muted Sage Green (Success/ZK Verified) */
-          --color-background: #F9F5F6; /* Soft Blush/Cream */
-          --color-dark: #3E3B3C;
-      }
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap');
 
-      /* --- Background Animation --- */
-      @keyframes softGradient {
-          0% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
+      :root {
+        --zk-bg: #4c1d95; /* Rich Violet base */
+        --zk-surface: #18181b;
+        --zk-surface-hover: #27272a;
+        --zk-border: #3f3f46;
+        --zk-primary: #8b5cf6; /* Violet */
+        --zk-accent: #fbbf24; /* Gold/Amber for 'ID' */
+        --zk-success: #10b981;
+        --zk-error: #ef4444;
+        --zk-text-main: #f4f4f5;
+        --zk-text-muted: #d4d4d8;
+        --glass-panel: rgba(255, 255, 255, 0.95); /* Light glass for card */
       }
 
       body {
-          /* Subtle Gradient Background */
-          background: linear-gradient(-45deg, var(--color-background), #FFFFFF, #F0E8E9);
-          background-size: 400% 400%;
-          animation: softGradient 15s ease infinite;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: var(--zk-text-main);
+        font-family: 'Inter', sans-serif;
+        min-height: 100vh;
       }
 
-      /* Custom Scrollbar for 'Funny Scroll' Effect */
-      ::-webkit-scrollbar {
-        width: 10px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #fdf2f8; /* Light blush track */
-        border-radius: 5px;
-      }
-      ::-webkit-scrollbar-thumb {
-        background: var(--color-primary); 
-        border-radius: 5px;
-        transition: background 0.3s ease;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #643846; /* Darker berry hover */
+      /* Dark mode override for dashboard only */
+      .dashboard-mode {
+        background: #09090b;
+        background-image: 
+          radial-gradient(circle at 50% 0%, rgba(139, 92, 246, 0.15), transparent 40%),
+          linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+        background-size: 100% 100%, 40px 40px, 40px 40px;
       }
 
-      /* Button Styles */
-      .btn-custom-primary {
-          background-color: var(--color-primary);
-          border-color: var(--color-primary);
-          color: white;
+      /* Components */
+      .zk-container {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 2rem 1rem;
       }
-      .btn-custom-primary:hover {
-          background-color: #643846;
-          border-color: #643846;
-          transform: translateY(-2px);
-          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+
+      /* Clean Professional Font */
+      .zk-logo {
+        font-family: 'Inter', sans-serif; 
+        font-weight: 800;
+        letter-spacing: -1px;
+        color: #fff;
+      }
+
+      /* Card Style */
+      .zk-card {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        overflow: hidden;
+        color: #18181b;
       }
       
-      /* Specific Dynamic Hover for Google Button */
-      .btn-google-dynamic {
-          background-color: #DB4437; /* Google Red */
-          border: none;
-          transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+      .dashboard-card {
+        background: rgba(24, 24, 27, 0.75);
+        backdrop-filter: blur(12px);
+        border: 1px solid var(--zk-border);
+        color: white;
       }
-      .btn-google-dynamic:hover {
-          background-color: #C1392D;
-          /* Dynamic lift and shadow glow */
-          transform: translateY(-4px); 
-          box-shadow: 0 10px 20px rgba(219, 68, 55, 0.5); 
+
+      .zk-btn {
+        background: var(--zk-surface);
+        border: 1px solid var(--zk-border);
+        color: var(--zk-text-main);
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
       }
-      .card-themed {
-          border-color: var(--color-primary) !important;
+
+      .zk-btn:hover {
+        transform: translateY(-1px);
       }
-      .text-themed-primary {
-          color: var(--color-primary) !important;
+
+      .zk-btn-primary {
+        background: linear-gradient(135deg, var(--zk-primary), #6d28d9);
+        border: none;
+        color: white;
+        box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
       }
-      .badge-themed-success {
-          background-color: var(--color-secondary) !important;
-          color: var(--color-dark) !important;
+      
+      .zk-btn-success {
+        background: rgba(16, 185, 129, 0.1);
+        border: 1px solid var(--zk-success);
+        color: var(--zk-success);
+      }
+
+      /* Provider Buttons */
+      .provider-btn {
+        width: 100%;
+        padding: 0.85rem 1rem;
+        margin-bottom: 1rem;
+        border-radius: 6px;
+        border: none;
+        color: white;
+        font-weight: 600;
+        font-size: 0.95rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        transition: opacity 0.2s;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+      .provider-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+      
+      .btn-google { background-color: #DB4437; }
+      .btn-github { background-color: #333333; }
+      .btn-discord { background-color: #5865F2; }
+
+      /* Terminal View for Proofs */
+      .terminal-window {
+        background: #000;
+        border: 1px solid #333;
+        border-radius: 8px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.85rem;
+        padding: 0;
+        margin-top: 1rem;
+      }
+      .terminal-header {
+        background: #1a1a1a;
+        padding: 8px 12px;
+        border-bottom: 1px solid #333;
+        display: flex;
+        gap: 6px;
+      }
+      .dot { width: 10px; height: 10px; border-radius: 50%; }
+      .red { background: #ff5f56; }
+      .yellow { background: #ffbd2e; }
+      .green { background: #27c93f; }
+      .terminal-body {
+        padding: 12px;
+        color: #0f0;
+        max-height: 250px;
+        overflow-y: auto;
+      }
+      .json-key { color: var(--zk-accent); }
+      .json-val { color: var(--zk-primary); }
+
+      /* Nav Tabs */
+      .zk-tabs {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 2rem;
+        border-bottom: 1px solid var(--zk-border);
+        padding-bottom: 1px;
+      }
+      .zk-tab {
+        background: none;
+        border: none;
+        color: #a1a1aa;
+        padding: 0.5rem 1rem;
+        font-weight: 600;
+        border-bottom: 2px solid transparent;
+        transition: all 0.2s;
+      }
+      .zk-tab:hover {
+        color: #fff;
+      }
+      .zk-tab.active {
+        color: var(--zk-accent);
+        border-bottom-color: var(--zk-accent);
+      }
+
+      /* Animations */
+      @keyframes spin { to { transform: rotate(360deg); } }
+      .processing-ring {
+        display: inline-block;
+        width: 1rem;
+        height: 1rem;
+        border: 2px solid rgba(255,255,255,0.3);
+        border-radius: 50%;
+        border-top-color: #fff;
+        animation: spin 1s ease-in-out infinite;
+        margin-right: 0.5rem;
       }
     `}} />
   );
 
+  // --- Logic Implementations (MPC & Auth) ---
+
   const backupSaltToMPC = async (userId, salt) => {
     try {
       const shares = splitNumericSalt(salt, 5, 3);
-      const shareObjects = shares.map((s, i) => ({
-        part: i + 1,
-        share: s.share
-      }));
-
-      const response = await fetch('http://localhost:3001/api/mpc/store', {
+      const shareObjects = shares.map((s, i) => ({ part: i + 1, share: s.share }));
+      await fetch('http://localhost:3001/api/mpc/store', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, shares: shareObjects })
       });
-
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       console.log('Salt backup successful');
     } catch (err) {
       console.error('MPC backup failed:', err);
-      alert('⚠️ Salt backup failed...');
     }
   };
 
   const recoverSaltFromMPC = async (userId) => {
     try {
-      console.log('Attempting to recover salt for userId:', userId);
       const res = await fetch(`http://localhost:3001/api/mpc/recover/${userId}`);
       const data = await res.json();
-      console.log('Server returned:', data);
-
-      if (!data.shares || data.shares.length < 3) {
-        console.warn('Not enough shares to recover salt:', data.shares?.length);
-        return null;
-      }
-
-      const recovered = combineNumericShares(data.shares);
-      console.log('Recovered salt:', recovered);
-      return recovered;
+      if (!data.shares || data.shares.length < 3) return null;
+      return combineNumericShares(data.shares);
     } catch (err) {
       console.error('MPC recovery failed:', err);
       return null;
@@ -231,74 +300,79 @@ function App() {
   };
 
   useEffect(() => {
+    document.title = "ZeroID | Enterprise Auth";
     const params = new URLSearchParams(window.location.search);
     const tokenParam = params.get('token');
     const userString = params.get('user');
 
     const initAuth = async () => {
       if (tokenParam && userString) {
-        const user = JSON.parse(decodeURIComponent(userString));
+        const userObj = JSON.parse(decodeURIComponent(userString));
+        
+        // 1. Check LocalStorage
         let salt = localStorage.getItem('zkSalt');
 
+        // 2. Fallback: Recover from MPC
         if (!salt) {
-          salt = await recoverSaltFromMPC(user._id);
+          console.log("Attempting Salt Recovery via MPC...");
+          salt = await recoverSaltFromMPC(userObj._id);
         }
 
+        // 3. Last Resort: Generate New
         if (!salt) {
+          console.log("Generating New Identity Salt...");
           salt = generateNumericSalt(16);
           localStorage.setItem('zkSalt', salt);
-          await backupSaltToMPC(user._id, salt);
+          await backupSaltToMPC(userObj._id, salt);
+        } else {
+            localStorage.setItem('zkSalt', salt);
         }
 
-        setUser({ ...user, salt });
+        setUser({ ...userObj, salt });
         setToken(tokenParam);
         localStorage.setItem('token', tokenParam);
         localStorage.setItem('user', userString);
+        window.history.replaceState({}, document.title, "/");
       }
     };
-
     initAuth();
   }, []);
 
-  const handleZKProof = async () => {
-    if (!token || !user?.salt) {
-      alert('Missing token or salt');
-      return;
-    }
-
-    const payload = parseJwt(token);
-    if (!payload) {
-      alert('Invalid JWT');
-      return;
-    }
-
-    if (!/^\d+$/.test(user.salt)) {
-      alert('Salt must be numeric!');
-      return;
-    }
-    
-    setIsVerified(null);
-    setHasGrantedAccess(false);
-
-    const sub_claim = payload.sub ? String(payload.sub).replace(/\D/g, '') : '123456';
-    const iss_claim = payload.iss || '111111'; 
-    const aud_claim = payload.aud || '654321'; 
-    const T_exp_claim = payload.exp ? String(payload.exp) : '999999';
-    const vku_ephemeral = generateRandomDecimalString(8);
-    const r_randomness = generateRandomDecimalString(8);
-
-    const inputs = {
-      sub: sub_claim,
-      aud: aud_claim,
-      iss: iss_claim,
-      salt: user.salt, 
-      vku: vku_ephemeral,
-      T_exp: T_exp_claim,
-      r: r_randomness, 
+  // Scroll Listener
+  useEffect(() => {
+    const handleScroll = () => {
+      const totalScroll = document.documentElement.scrollTop;
+      const windowHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+      if (windowHeight === 0) return;
+      const scroll = totalScroll / windowHeight;
+      setScrollProgress(scroll * 100);
     };
 
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const handleZKProof = async () => {
+    if (!token || !user?.salt) return;
+
+    const payload = parseJwt(token);
+    if (!payload) return;
+
+    setIsVerified(null);
+    setHasGrantedAccess(false);
     setLoading(true);
+
     try {
+      const inputs = {
+        sub: payload.sub ? String(payload.sub).replace(/\D/g, '') : '123456',
+        aud: payload.aud || '654321',
+        iss: payload.iss || '111111', 
+        salt: user.salt, 
+        vku: generateRandomDecimalString(8),
+        T_exp: payload.exp ? String(payload.exp) : '999999',
+        r: generateRandomDecimalString(8), 
+      };
+
       const { proof, publicSignals } = await groth16.fullProve(
         inputs,
         '/circuits/zklogin.wasm',
@@ -308,18 +382,14 @@ function App() {
       setPublicSignals(publicSignals);
     } catch (err) {
       console.error('ZK Proof failed:', err);
-      alert('ZK Proof failed: ' + (err.message || 'Unknown error'));
+      alert('ZK Proof generation failed.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleVerify = async () => {
-    if (!proof || !publicSignals) {
-      alert('No proof to verify');
-      return;
-    }
-
+    if (!proof || !publicSignals) return;
     try {
       const res = await fetch('http://localhost:3001/api/zk/verify', {
         method: 'POST',
@@ -329,227 +399,232 @@ function App() {
       const data = await res.json();
       setIsVerified(data.valid);
     } catch (err) {
-      console.error('Verification error:', err);
-      alert('Verification failed: ' + (err.message || 'Network error'));
+      alert('Verification failed');
     }
   };
 
   const handleGrantFullAccess = (provider) => {
     setHasGrantedAccess(true);
-
-    let redirectUrl = '';
-    let serviceName = '';
-
-    if (provider === 'google') {
-        redirectUrl = 'https://myaccount.google.com/';
-        serviceName = 'Google Account Features';
-    } else if (provider === 'github') {
-        redirectUrl = 'https://github.com/settings/profile';
-        serviceName = 'GitHub Account Settings';
-    } else if (provider === 'discord') {
-        redirectUrl = 'https://discord.com/channels/@me';
-        serviceName = 'Discord App Services';
-    } else {
-        alert('Unknown provider, cannot grant full access.');
-        setHasGrantedAccess(false);
-        return;
+    const urls = {
+      google: 'https://myaccount.google.com/',
+      github: 'https://github.com/settings/profile',
+      discord: 'https://discord.com/channels/@me'
+    };
+    if (urls[provider]) {
+      setTimeout(() => window.location.href = urls[provider], 1000);
     }
-    
-    // Simulate redirection to the authorized resource
-    alert(`✅ Access granted! Redirecting to full ${serviceName} to demonstrate enhanced features.`);
-    window.location.href = redirectUrl;
-  };
-
-  const handleRecoverSalt = async () => {
-    if (!user?._id) {
-      alert('User not logged in');
-      return;
-    }
-    const salt = await recoverSaltFromMPC(user._id);
-    if (salt && /^\d+$/.test(salt)) {
-      localStorage.setItem('zkSalt', salt);
-      setUser(prev => ({ ...prev, salt }));
-      alert('✅ Salt recovered!');
-    } else {
-      alert('❌ Recovery failed or invalid salt');
-    }
-  };
-
-  const handleLoginGoogle = () => {
-    window.location.href = 'http://localhost:3001/api/auth/google?prompt=select_account';
-  };
-
-  const handleLoginGithub = () => {
-    window.location.href = 'http://localhost:3001/api/auth/github'; 
-  };
-
-  const handleLoginDiscord = () => {
-    window.location.href = 'http://localhost:3001/api/auth/discord'; 
   };
 
   const handleLogout = () => {
-    const provider = user?.provider;
     setUser(null);
     setToken(null);
     setProof(null);
-    setPublicSignals(null);
-    setIsVerified(null);
-    setHasGrantedAccess(false); 
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('zkSalt');
-
-    if (provider === 'github') {
-      window.location.href = 'https://github.com';
-    } else if (provider === 'discord') {
-      window.location.href = 'https://discord.com/app';
-    } else {
-      window.location.href = '/';
-    }
+    window.location.href = '/';
   };
 
-  const supportedProviders = ['google', 'github', 'discord'];
+  // --- Render Sections ---
 
-  return (
-    <div className="container py-5 d-flex flex-column align-items-center" style={{ minHeight: '100vh', paddingBottom: '100px' }}>
-      <ScrollbarStyle /> 
-      
-      <div className="text-center mb-4" style={headerStyle}>
-        <h1 className="fw-bolder text-themed-primary">zkLogin Frontend</h1>
-        <p className="text-muted">
-          Client-Side Zero-Knowledge Proof (NIZK Groth16) Authentication Demo
+  const renderHero = () => (
+    <div className="d-flex flex-column align-items-center justify-content-center min-vh-100 text-center">
+      <div className="mb-4">
+        <h1 className="display-3 fw-bold zk-logo mb-2">
+          Zero<span style={{ color: '#fbbf24' }}>ID</span>
+        </h1>
+        <p className="text-white h6 opacity-75 fw-light" style={{letterSpacing: '1px'}}>
+          The Enterprise-Grade Zero-Knowledge Identity Provider
         </p>
       </div>
+      
+      <div className="zk-card p-5 mt-4 text-center" style={{maxWidth: '450px', width: '100%'}}>
+        <h5 className="mb-4 text-dark fw-bold">Sign in to Dashboard</h5>
+        
+        <button className="provider-btn btn-google" onClick={() => window.location.href = 'http://localhost:3001/api/auth/google'}>
+          <i className="bi bi-google"></i> Continue with Google
+        </button>
+        
+        <button className="provider-btn btn-github" onClick={() => window.location.href = 'http://localhost:3001/api/auth/github'}>
+          <i className="bi bi-github"></i> Continue with GitHub
+        </button>
+        
+        <button className="provider-btn btn-discord" onClick={() => window.location.href = 'http://localhost:3001/api/auth/discord'}>
+          <i className="bi bi-discord"></i> Continue with Discord
+        </button>
 
-      <div style={{ maxWidth: '600px', width: '100%' }}>
-        {!user && (
-          <div className="alert alert-info border-info mb-4 shadow-sm text-center">
-            <strong>Note:</strong> To log in with a different GitHub or Discord account, 
-            please log out of those services first in another browser tab.
-          </div>
-        )}
+        <div className="mt-4 pt-3 border-top d-flex justify-content-between text-muted" style={{fontSize: '0.75rem'}}>
+          <span>v1.0.0 (Beta)</span>
+          <span>ZeroID © 2025</span>
+        </div>
+      </div>
+    </div>
+  );
 
-        {/* --- FORMAL SECURITY GUARANTEES SECTION --- */}
-        <div className="card shadow-lg mb-4 border-3 border-dark">
-          <div className="card-header bg-dark text-white fw-bold">
-            <span className="me-2">🛡️</span> Formal Security Guarantees (ProVerif)
+  const renderDashboard = () => (
+    <div className="min-vh-100 dashboard-mode">
+      <div className="zk-container pt-5">
+        <div className="d-flex justify-content-between align-items-center mb-5">
+          <div>
+            <h2 className="zk-logo m-0 fs-3 text-white">
+              Zero<span style={{ color: '#fbbf24' }}>ID</span>
+              <span className="opacity-75 ms-2" style={{fontFamily: 'Inter, sans-serif'}}>/ Dashboard</span>
+            </h2>
           </div>
-          <ul className="list-group list-group-flush">
-            <li className="list-group-item d-flex justify-content-between align-items-center small">
-              <span>**Unforgeability** (Authentication Correspondence)</span>
-              <span className="badge badge-themed-success py-2">PROVEN</span>
-            </li>
-            <li className="list-group-item d-flex justify-content-between align-items-center small">
-              <span>**Unlinkability** (Salt Secrecy)</span>
-              <span className="badge badge-themed-success py-2">PROVEN</span>
-            </li>
-            <li className="list-group-item d-flex justify-content-between align-items-center small">
-              <span>**Replay Resistance** (via Ephemeral Nonce)</span>
-              <span className="badge badge-themed-success py-2">PROVEN</span>
-            </li>
-          </ul>
+          <div className="d-flex align-items-center gap-3">
+            <div className="text-end d-none d-md-block">
+              <div className="fw-bold text-white">{user.name}</div>
+              <div className="small text-white-50 text-uppercase">{user.provider} linked</div>
+            </div>
+            <img src={user.avatar || "https://ui-avatars.com/api/?name=" + user.name} alt="Profile" className="rounded-circle border border-secondary" width="40" height="40" />
+            <button className="zk-btn" onClick={handleLogout} style={{color: 'white', borderColor: 'white'}}>Log Out</button>
+          </div>
         </div>
 
-        {user ? (
-          <div className="card p-4 shadow-lg border-2" style={{borderColor: 'var(--color-secondary)'}}>
-            <h4 className="card-title text-themed-primary mb-3">Welcome Back, {user.name}</h4>
-            
-            <div className="mb-3 p-3 bg-light rounded small border">
-                <p className="mb-1">Authenticated Provider: <span className="fw-bold text-dark">{user.provider.toUpperCase()}</span></p>
-                <p className="mb-1">Identity Status: <span className="fw-bold text-success">ZK-Private</span></p>
-                <p className="mb-0">Secret Salt (Proof Witness): <code className="text-danger">{user.salt}</code></p>
-            </div>
-
-            <div className="d-flex flex-wrap gap-2 mb-4">
-              <button
-                className="btn btn-custom-primary flex-grow-1"
-                onClick={handleZKProof}
-                disabled={loading}
-              >
-                {loading ? '⏳ Generating Proof...' : 'Generate ZK Proof'}
-              </button>
-              <button
-                className="btn btn-warning"
-                onClick={handleRecoverSalt}
-              >
-                <span className="me-1">🔑</span> Recover Salt (MPC)
-              </button>
-            </div>
-
-            {proof && (
-              <div className="mt-3">
-                <h5 className="text-themed-primary border-bottom pb-1">Proof Status & Verification</h5>
-                
-                <div className="row mb-3">
-                    <div className="col-md-6 mb-2">
-                        <small className="d-block fw-bold mb-1">ZK Proof (<InlineMath math="\pi_{zk}" />)</small> 
-                        <pre className="bg-dark text-white p-2 rounded small overflow-auto" style={{ maxHeight: '150px' }}>
-                            {JSON.stringify(proof, null, 2)}
-                        </pre>
-                    </div>
-                    <div className="col-md-6 mb-2">
-                        <small className="d-block fw-bold mb-1">Public Signals (userComp, nonce)</small>
-                        <pre className="bg-dark text-white p-2 rounded small overflow-auto" style={{ maxHeight: '150px' }}>
-                            {JSON.stringify(publicSignals, null, 2)}
-                        </pre>
-                    </div>
+        <div className="row g-4">
+          <div className="col-lg-4">
+            <div className="zk-card dashboard-card p-4 h-100">
+              <h5 className="text-white mb-4">Identity Artifacts</h5>
+              <div className="mb-4">
+                <label className="small text-uppercase fw-bold mb-2" style={{color: '#a1a1aa'}}>Protocol Status</label>
+                <div className="d-flex align-items-center gap-2">
+                  <span className="dot green"></span>
+                  <span className="text-white">OIDC Token Active</span>
                 </div>
-
-                {/* Verification Button and Result */}
-                <div className="d-flex align-items-center justify-content-between">
-                    <button className="btn btn-success flex-grow-1 me-3" onClick={handleVerify} style={{backgroundColor: 'var(--color-secondary)', borderColor: 'var(--color-secondary)', color: 'var(--color-dark)'}}>
-                        Verify ZK Proof (Server-Side)
-                    </button>
-                    {isVerified !== null && (
-                        <span className={`badge fs-6 ${isVerified ? 'badge-themed-success' : 'bg-danger'}`}>
-                            {isVerified ? '✅ VALID' : '❌ INVALID'}
-                        </span>
-                    )}
-                </div>
-
-                {/* Conditional Full Access Section */}
-                {isVerified === true && !hasGrantedAccess && supportedProviders.includes(user.provider) && (
-                  <div className="mt-4 p-3 rounded border border-warning" style={{backgroundColor: '#F7E6E9'}}>
-                    <p className="mb-2 fw-bold text-dark">Grant Enhanced Access ({user.provider.toUpperCase()}):</p>
-                    <p className="text-muted small mb-2">
-                      Unlock full features by linking your complete {user.provider} identity. This moves from private ZK access to standard OAuth-based resource access.
-                    </p>
-                    <button 
-                      className="btn btn-warning btn-sm"
-                      onClick={() => handleGrantFullAccess(user.provider)}
-                    >
-                      <span className="me-1">🔓</span> Grant Full Access
-                    </button>
-                  </div>
-                )}
-                {isVerified === true && hasGrantedAccess && (
-                  <div className="mt-3 alert d-flex align-items-center" style={{backgroundColor: 'var(--color-secondary)', color: 'var(--color-dark)', borderColor: 'var(--color-secondary)'}}>
-                    <span className="fs-5 me-2">⭐</span>Full {user.provider} Access Granted!
-                  </div>
-                )}
               </div>
-            )}
+              <div className="mb-4">
+                <label className="small text-uppercase fw-bold mb-2" style={{color: '#a1a1aa'}}>Cryptographic Salt</label>
+                <div className="d-flex gap-2">
+                  <code className="flex-grow-1 bg-black p-2 rounded border border-secondary text-truncate" style={{color: 'var(--zk-accent)'}}>
+                    {user.salt ? '••••••••••••••••' : 'Missing'}
+                  </code>
+                  <button className="zk-btn px-2" onClick={() => alert(user.salt)}>👁</button>
+                </div>
+                <small className="d-block mt-2" style={{color: '#a1a1aa'}}>
+                  Stored via MPC (Shamir Secret Sharing)
+                </small>
+              </div>
+            </div>
+          </div>
 
-            <button className="btn btn-outline-secondary mt-4" onClick={handleLogout}>
-              Logout
-            </button>
+          <div className="col-lg-8">
+            <div className="zk-card dashboard-card p-4">
+              <div className="zk-tabs">
+                <button className={`zk-tab ${activeTab === 'proof' ? 'active' : ''}`} onClick={() => setActiveTab('proof')}>Proof Generation</button>
+                <button className={`zk-tab ${activeTab === 'security' ? 'active' : ''}`} onClick={() => setActiveTab('security')}>Security Audit</button>
+                <button className={`zk-tab ${activeTab === 'api' ? 'active' : ''}`} onClick={() => setActiveTab('api')}>Developers & API</button>
+              </div>
+
+              {activeTab === 'proof' && (
+                <div className="fade-in">
+                  {!proof ? (
+                    <div className="text-center py-5">
+                      <div className="mb-4 text-muted" style={{fontSize: '4rem'}}>🛡️</div>
+                      <h4 className="text-white">Ready to Authenticate</h4>
+                      <p className="mb-4" style={{color: '#d4d4d8'}}>
+                        Generate a zk-SNARK proof to validate your identity<br/>
+                        without revealing your OIDC token to the server.
+                      </p>
+                      <button className="zk-btn zk-btn-primary btn-lg" onClick={handleZKProof} disabled={loading}>
+                        {loading ? <span className="processing-ring"></span> : '⚡'} 
+                        {loading ? 'Computing Circuit...' : 'Generate Proof'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="d-flex justify-content-between align-items-center mb-3">
+                        <h5 className="text-white m-0">Proof Artifact</h5>
+                        <span className="badge bg-secondary">Groth16</span>
+                      </div>
+                      <div className="terminal-window mb-4">
+                        <div className="terminal-header">
+                          <div className="dot red"></div><div className="dot yellow"></div><div className="dot green"></div>
+                        </div>
+                        <div className="terminal-body">
+                          <div><span className="json-key">"proof"</span>: <span className="text-muted">{'{'}</span></div>
+                          <div className="ps-3"><span className="json-key">"curve"</span>: <span className="json-val">"bn128"</span>,</div>
+                          <div className="ps-3"><span className="json-key">"pi_a"</span>: [<span className="json-val">"{proof.pi_a[0].substring(0, 20)}..."</span>],</div>
+                          <div className="ps-3"><span className="json-key">"pi_b"</span>: [[...]],</div>
+                          <div><span className="text-muted">{'}'}</span></div>
+                          <div className="mt-2"><span className="json-key">"publicSignals"</span>: [</div>
+                          {publicSignals && publicSignals.map((s, i) => (
+                             <div key={i} className="ps-3"><span className="json-val">"{s.substring(0, 50)}..."</span>,</div>
+                          ))}
+                          <div>]</div>
+                        </div>
+                      </div>
+                      <div className="d-flex gap-3">
+                        <button className="zk-btn flex-grow-1" onClick={() => { setProof(null); setIsVerified(null); }} style={{color:'white'}}>Reset</button>
+                        <button className={`zk-btn flex-grow-1 ${isVerified ? 'zk-btn-success' : 'zk-btn-primary'}`} onClick={handleVerify} disabled={isVerified}>
+                          {isVerified ? '✅ Verified on Chain/Server' : '🚀 Send to Verifier'}
+                        </button>
+                      </div>
+                      {isVerified && (
+                         <div className="mt-4 p-3 rounded border border-success bg-opacity-10 bg-success animate__animated animate__fadeIn">
+                           <div className="d-flex align-items-center justify-content-between">
+                             <div><strong className="text-success d-block">Authentication Successful</strong><small className="text-muted">Server verified identity without seeing JWT.</small></div>
+                             {!hasGrantedAccess && (<button className="zk-btn zk-btn-success py-1" onClick={() => handleGrantFullAccess(user.provider)}>Enter App →</button>)}
+                           </div>
+                         </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'security' && (
+                <div className="row g-3">
+                  <div className="col-12"><div className="p-3 border border-secondary rounded"><h6 className="text-white">🧮 Circuit Properties</h6><p className="small mb-0" style={{color: '#a1a1aa'}}>Constraint System: R1CS using Groth16. <br/>Curves: BN128.</p></div></div>
+                  <div className="col-12"><div className="p-3 border border-secondary rounded"><h6 className="text-white">🔐 MPC Salt Storage</h6><p className="small mb-0" style={{color: '#a1a1aa'}}>Salt recovered via Shamir Secret Sharing (t=3, n=5).</p></div></div>
+                  <div className="col-12"><div className="p-3 border border-secondary rounded"><h6 className="text-white">🛡️ Formal Verification</h6><p className="small mb-0" style={{color: '#a1a1aa'}}>Protocol formally verified using ProVerif.</p></div></div>
+                </div>
+              )}
+
+              {activeTab === 'api' && (
+                <div className="text-center py-4">
+                   <div className="mb-2 text-muted" style={{fontSize: '2.5rem'}}>🚀</div>
+                   <h5 className="text-white mb-4">Enterprise API Endpoints</h5>
+                   
+                   {/* ENDPOINT 1: AUTH */}
+                   <div className="mb-4">
+                     <div className="d-flex justify-content-between align-items-center mb-1 px-1">
+                       <small className="text-uppercase fw-bold" style={{color:'#fbbf24'}}>Authentication</small>
+                       <span className="badge bg-secondary">POST</span>
+                     </div>
+                     <div className="p-3 bg-black rounded border border-secondary text-start font-monospace small" style={{color: '#a1a1aa'}}>
+                        $ curl -X POST https://api.zeroid.io/v1/auth \<br/>
+                        &nbsp;&nbsp;-H "Authorization: Bearer YOUR_API_KEY"
+                     </div>
+                   </div>
+
+                   {/* ENDPOINT 2: RECOVERY (Added per request) */}
+                   <div className="mb-4">
+                     <div className="d-flex justify-content-between align-items-center mb-1 px-1">
+                       <small className="text-uppercase fw-bold" style={{color:'#10b981'}}>Identity Recovery</small>
+                       <span className="badge bg-secondary">GET</span>
+                     </div>
+                     <div className="p-3 bg-black rounded border border-secondary text-start font-monospace small" style={{color: '#a1a1aa'}}>
+                        $ curl -X GET https://api.zeroid.io/v1/recover/{'{user_id}'} \<br/>
+                        &nbsp;&nbsp;-H "Authorization: Bearer YOUR_API_KEY"
+                     </div>
+                   </div>
+
+                   <button className="zk-btn w-100 justify-content-center" disabled>Upgrade to Enterprise to Unlock</button>
+                </div>
+              )}
+
+            </div>
           </div>
-        ) : (
-          <div className="d-flex flex-column gap-3 p-4 bg-white rounded shadow-lg border card-themed">
-            <h5 className="text-center text-themed-primary mb-3">Authenticate with Provider:</h5>
-            {/* Google Button with Dynamic Hover */}
-            <button className="btn btn-google-dynamic btn-lg shadow-sm" onClick={handleLoginGoogle}>
-              Login with Google
-            </button>
-            <button className="btn btn-dark btn-lg shadow-sm" onClick={handleLoginGithub}>
-              Login with GitHub
-            </button>
-            <button className="btn btn-primary btn-lg shadow-sm" onClick={handleLoginDiscord}>
-              Login with Discord
-            </button>
-          </div>
-        )}
+        </div>
       </div>
+    </div>
+  );
+
+  return (
+    <div className="min-vh-100 position-relative overflow-hidden">
+      <ThemeStyles />
+      <div style={{position: 'fixed', top: 0, left: 0, height: '2px', width: `${scrollProgress}%`, background: 'var(--zk-accent)', zIndex: 1000}} />
+      {!user ? renderHero() : renderDashboard()}
     </div>
   );
 }
